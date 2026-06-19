@@ -1,0 +1,1256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KEY/ROY HOME</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --bg: #f2f1ef;
+    --surface: #ffffff;
+    --surface2: #faf9f8;
+    --border: #e6e4e1;
+    --text: #1c1c1c;
+    --muted: #8c8a86;
+    --red: #e03e3e;
+    --green: #1f9d6c;
+    --orange: #f08c1e;
+    --purple: #7b2fbf;
+    --blue: #2563eb;
+    --shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  html, body {
+    height:100%; overflow:hidden;
+    background:var(--bg); color:var(--text);
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .app { display:flex; flex-direction:column; height:100vh; }
+
+  /* ── TOPBAR ── */
+  .topbar {
+    flex-shrink:0;
+    display:flex; align-items:center;
+    height:44px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+    padding:0 16px;
+    gap:18px;
+  }
+  .brand { display:flex; align-items:center; gap:9px; }
+  .brand-logo {
+    width:24px; height:24px;
+    background:var(--text); color:#fff;
+    border-radius:5px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.75rem; font-weight:700;
+  }
+  .brand-name { font-size:0.82rem; font-weight:700; letter-spacing:0.04em; }
+  .brand-tag {
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.58rem; color:var(--muted);
+    letter-spacing:0.1em; text-transform:uppercase;
+    border-left:1px solid var(--border);
+    padding-left:12px;
+  }
+  .top-center {
+    flex:1; display:flex; align-items:center; justify-content:center; gap:8px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.7rem; color:var(--muted);
+  }
+  .top-right { display:flex; align-items:center; gap:12px; }
+  .top-temp {
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.7rem; color:var(--text); font-weight:500;
+    background:var(--surface2);
+    border:1px solid var(--border);
+    border-radius:5px; padding:3px 9px;
+  }
+  .mic-btn {
+    width:30px; height:30px; border-radius:50%;
+    background:var(--surface2); border:1px solid var(--border);
+    cursor:pointer; font-size:0.85rem;
+    display:flex; align-items:center; justify-content:center;
+    transition:all .2s;
+  }
+  .mic-btn:hover { background:#eee; }
+  .mic-btn.listening {
+    background:#fdeaea; border-color:#f5b5b5;
+    animation:pulse-mic 1.2s infinite;
+  }
+  @keyframes pulse-mic { 0%,100%{box-shadow:0 0 0 0 rgba(224,62,62,0.25);} 50%{box-shadow:0 0 0 6px rgba(224,62,62,0.08);} }
+  .avatar {
+    width:28px; height:28px; border-radius:50%;
+    background:#f0855a; color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.62rem; font-weight:700;
+  }
+  .user-name { font-size:0.72rem; color:var(--text); }
+  .user-name span { color:var(--muted); }
+
+  /* ── LED STRIP ── */
+  .led-strip {
+    flex-shrink:0; height:24px;
+    background:#0a0e14; overflow:hidden; position:relative;
+    display:flex; align-items:center;
+    border-bottom:1px solid var(--border);
+  }
+  #ledWeatherBg { position:absolute; inset:0; z-index:0; pointer-events:none; }
+  .led-track { white-space:nowrap; will-change:transform; animation:led-scroll 25s linear infinite; position:relative; z-index:1; }
+  @keyframes led-scroll { 0%{transform:translateX(100vw);} 100%{transform:translateX(-100%);} }
+  .led-text {
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.7rem; font-weight:600; letter-spacing:0.12em;
+    color:#ffb627;
+    text-shadow:0 0 6px rgba(255,182,39,0.7);
+  }
+  .led-dolar {
+    color:#3ddc84;
+    text-shadow:0 0 6px rgba(61,220,132,0.7);
+  }
+
+  /* ── MAIN ── */
+  .main {
+    flex:1; min-width:0;
+    display:grid;
+    grid-template-columns: 250px 1fr 230px;
+    gap:10px;
+    padding:12px;
+    overflow:hidden;
+  }
+
+  .stats-col, .right-col { display:flex; flex-direction:column; gap:8px; min-height:0; overflow:hidden; }
+  .center-col { display:flex; flex-direction:column; gap:10px; min-height:0; }
+
+  /* ── STAT CARDS ── */
+  .stat-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-left:3px solid var(--muted);
+    border-radius:6px;
+    padding:10px 12px;
+    box-shadow:var(--shadow);
+    flex-shrink:0;
+  }
+  .stat-card.red    { border-left-color:var(--red); }
+  .stat-card.green  { border-left-color:var(--green); }
+  .stat-card.orange { border-left-color:var(--orange); }
+  .stat-card.blue   { border-left-color:var(--blue); }
+  .stat-card.purple { border-left-color:var(--purple); }
+
+  .stat-label {
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.58rem; font-weight:600;
+    letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--muted);
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .stat-val { font-size:1.6rem; font-weight:700; line-height:1.2; margin:2px 0; }
+  .stat-sub { font-family:'JetBrains Mono',monospace; font-size:0.6rem; color:var(--muted); }
+
+  /* Consejo */
+  .consejo {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-left:3px solid var(--orange);
+    border-radius:6px;
+    padding:10px 12px;
+    box-shadow:var(--shadow);
+    display:flex; gap:9px; align-items:center;
+    flex-shrink:0;
+  }
+  .consejo-icon { font-size:1.3rem; }
+  .consejo-tit { font-size:0.72rem; font-weight:600; }
+  .consejo-txt { font-family:'JetBrains Mono',monospace; font-size:0.58rem; color:var(--muted); margin-top:2px; }
+
+  /* Plano card */
+  .plano-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:6px;
+    box-shadow:var(--shadow);
+    padding:10px 12px;
+    flex:1; min-height:0;
+    display:flex; flex-direction:column;
+  }
+  #planoCanvas { flex:1; width:100%; min-height:0; border-radius:4px; }
+
+  /* ── CENTRO ── */
+  .panel-title-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:6px;
+    box-shadow:var(--shadow);
+    padding:10px 14px;
+    flex-shrink:0;
+  }
+  .panel-title { font-size:1rem; font-weight:700; }
+  .panel-sub { font-family:'JetBrains Mono',monospace; font-size:0.6rem; color:var(--muted); margin-top:1px; }
+
+  .cams-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:6px;
+    box-shadow:var(--shadow);
+    padding:12px;
+    flex:1.15; min-height:0;
+    display:flex; flex-direction:column;
+  }
+  .cams-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; flex:1; min-height:0; }
+  .cam-box { display:flex; flex-direction:column; min-height:0; }
+  .cam-label {
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.58rem; font-weight:600; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--muted);
+    margin-bottom:5px;
+    display:flex; align-items:center; gap:6px;
+  }
+  .dot { width:6px; height:6px; border-radius:50%; display:inline-block; }
+  .dot.g { background:var(--green); } .dot.o { background:var(--orange); } .dot.r { background:var(--red); }
+  .cam-wrap { position:relative; border-radius:5px; overflow:hidden; background:#0e0e0e; flex:1; min-height:0; }
+  .cam-wrap canvas, .cam-wrap video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+  .cam-badges { position:absolute; top:6px; left:6px; display:flex; gap:4px; z-index:2; }
+  .cam-badge {
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.55rem; font-weight:600; padding:2px 6px; border-radius:3px;
+    background:rgba(0,0,0,0.55); color:#fff; backdrop-filter:blur(4px);
+  }
+  .cam-badge.rec { color:#ff6b6b; }
+  .cam-badge.btn { cursor:pointer; background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.2); }
+  .cam-ts { position:absolute; bottom:5px; right:6px; font-family:'JetBrains Mono',monospace; font-size:0.52rem; color:rgba(255,255,255,0.45); background:rgba(0,0,0,0.35); padding:1px 5px; border-radius:3px; z-index:2; }
+
+  /* MAPAS */
+  .maps-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:6px;
+    box-shadow:var(--shadow);
+    padding:12px;
+    flex:1; min-height:0;
+    display:flex; flex-direction:column;
+  }
+  .maps-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; flex:1; min-height:0; }
+  .map-box { display:flex; flex-direction:column; min-height:0; }
+  .map-label {
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.58rem; font-weight:600; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--muted);
+    margin-bottom:5px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .map-tag { font-weight:600; }
+  .map-area { flex:1; min-height:0; border-radius:5px; overflow:hidden; border:1px solid var(--border); position:relative; }
+  .map-area > div { width:100%; height:100%; }
+  .map-badge {
+    position:absolute; top:7px; left:7px; z-index:500;
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.55rem; font-weight:600;
+    background:rgba(255,255,255,0.95);
+    border:1px solid var(--border); border-radius:4px; padding:3px 8px;
+  }
+  .map-input-row { display:flex; gap:5px; margin-top:6px; flex-shrink:0; }
+  .map-input-row input {
+    flex:1; font-family:'JetBrains Mono',monospace;
+    font-size:0.6rem; padding:5px 8px;
+    border:1px solid var(--border); border-radius:4px; outline:none;
+  }
+  .map-input-row button {
+    font-size:0.62rem; font-weight:600; padding:5px 9px;
+    border:none; border-radius:4px; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .btn-ver { background:var(--text); color:#fff; }
+  .btn-casa { background:var(--surface2); border:1px solid var(--border) !important; }
+
+  /* ── DERECHA ── */
+  .dev-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:6px;
+    box-shadow:var(--shadow);
+    padding:10px 12px;
+    flex:1; min-height:0;
+    display:flex; flex-direction:column;
+  }
+  .dev-title {
+    font-family:'JetBrains Mono',monospace;
+    font-size:0.58rem; font-weight:600; letter-spacing:0.12em;
+    text-transform:uppercase; color:var(--muted);
+    margin-bottom:8px;
+  }
+  .ctrl {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 0;
+    border-bottom:1px solid var(--surface2);
+  }
+  .ctrl:last-child { border-bottom:none; }
+  .ctrl-name { font-size:0.74rem; font-weight:500; display:flex; align-items:center; gap:7px; }
+  .ctrl-st { font-family:'JetBrains Mono',monospace; font-size:0.56rem; color:var(--muted); margin-top:1px; }
+  .ctrl-st.on { color:var(--green); font-weight:600; }
+
+  .tog { position:relative; width:32px; height:17px; cursor:pointer; flex-shrink:0; }
+  .tog input { opacity:0; width:0; height:0; }
+  .tog-track { position:absolute; inset:0; background:#ddd; border-radius:9px; transition:.2s; }
+  .tog-track::after { content:''; position:absolute; width:11px; height:11px; border-radius:50%; background:#fff; top:3px; left:3px; transition:.2s; box-shadow:0 1px 2px rgba(0,0,0,0.2); }
+  .tog input:checked + .tog-track { background:var(--green); }
+  .tog input:checked + .tog-track::after { transform:translateX(15px); }
+
+  /* AC panel */
+  #airePanel { display:none; align-items:center; gap:8px; padding:5px 0 2px; }
+  .ac-btn { width:20px; height:20px; border-radius:50%; border:1px solid var(--border); background:#fff; cursor:pointer; font-size:0.75rem; line-height:1; }
+
+  /* Asistente bar */
+  .assistant-bar {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:rgba(28,28,28,0.95); color:#fff;
+    border-radius:8px; padding:8px 16px;
+    font-family:'JetBrains Mono',monospace; font-size:0.68rem;
+    box-shadow:0 4px 20px rgba(0,0,0,0.25);
+    z-index:1000; min-width:220px; max-width:440px; text-align:center;
+    opacity:0; pointer-events:none; transition:opacity .3s;
+  }
+  .assistant-bar.show { opacity:1; }
+  .assistant-bar .heard { color:#ffb627; }
+
+  /* Cam fullscreen */
+  .cam-fullscreen { display:none; position:fixed; inset:0; background:#000; z-index:500; flex-direction:column; }
+  .cam-fullscreen.show { display:flex; }
+  .cam-fs-header { position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; padding:12px 18px; background:linear-gradient(to bottom,rgba(0,0,0,0.6),transparent); z-index:10; }
+  .cam-fs-title { font-family:'JetBrains Mono',monospace; font-size:0.72rem; font-weight:600; color:#fff; letter-spacing:0.1em; text-transform:uppercase; }
+  .cam-fs-close { font-size:0.65rem; color:rgba(255,255,255,0.8); background:rgba(255,255,255,0.15); border:none; border-radius:4px; padding:4px 10px; cursor:pointer; font-family:'Inter',sans-serif; }
+  .cam-fs-body { flex:1; display:flex; }
+  .cam-fs-body canvas { width:100%; height:100%; object-fit:cover; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-logo">K</div>
+      <span class="brand-name">KEY/ROY</span>
+      <span class="brand-tag">Home Control</span>
+    </div>
+    <div class="top-center">
+      <span id="fecha">--</span> · <span id="clock">--:--:--</span>
+    </div>
+    <div class="top-right">
+      <div class="top-temp">🌡️ <span id="extTempHeaderVal">--°C</span></div>
+      <button class="mic-btn" id="micBtn" onclick="toggleMic()" title="Hola Roy">🎤</button>
+      <span class="user-name">Roy <span>· Administrador</span></span>
+      <div class="avatar">RM</div>
+    </div>
+  </div>
+
+  <!-- CINTA LED -->
+  <div class="led-strip">
+    <canvas id="ledWeatherBg"></canvas>
+    <div class="led-track"><span class="led-text" id="ledText">● KEY/ROY HOME · Iniciando sistema...</span></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- COL IZQUIERDA: stats -->
+    <div class="stats-col">
+      <div class="stat-card blue">
+        <div class="stat-label">Interior · Temp</div>
+        <div class="stat-val" id="tInt">22.4°</div>
+        <div class="stat-sub">humedad <span id="hInt">58</span>%</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Exterior · CABA</div>
+        <div class="stat-val" id="tExt">--°</div>
+        <div class="stat-sub">humedad <span id="hExt">--</span>% · en vivo</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="stat-label">Sala · Sensor</div>
+        <div class="stat-val" id="tSala">23.0°</div>
+        <div class="stat-sub" id="tSalaSub">rango normal</div>
+      </div>
+      <div class="consejo">
+        <span class="consejo-icon" id="consejoIcon">⏳</span>
+        <div>
+          <div class="consejo-tit" id="consejoTitulo">Cargando pronóstico...</div>
+          <div class="consejo-txt" id="consejoTexto">Consultando clima</div>
+        </div>
+      </div>
+      <div class="plano-card">
+        <div class="dev-title">Plano de casa</div>
+        <canvas id="planoCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- CENTRO: cámaras + mapas -->
+    <div class="center-col">
+      <div class="panel-title-card">
+        <div class="panel-title">dashboard</div>
+        <div class="panel-sub">Resumen operativo en tiempo real · KEY/ROY HOME</div>
+      </div>
+
+      <div class="cams-card">
+        <div class="dev-title">Cámaras de seguridad</div>
+        <div class="cams-grid">
+          <div class="cam-box">
+            <div class="cam-label"><span class="dot g"></span> CAM 01 · CALLE</div>
+            <div class="cam-wrap">
+              <video id="camTuya" autoplay playsinline muted style="display:none;"></video>
+              <canvas id="cam1"></canvas>
+              <div class="cam-badges">
+                <span class="cam-badge rec" id="rec1">● SIM</span>
+                <span class="cam-badge btn" id="btnTuya" onclick="verCamTuya()">▶ En vivo</span>
+              </div>
+              <div class="cam-ts" id="camTs1">--</div>
+            </div>
+          </div>
+          <div class="cam-box">
+            <div class="cam-label"><span class="dot o"></span> CAM 02 · CASA</div>
+            <div class="cam-wrap">
+              <video id="camVideo" autoplay playsinline muted style="display:none;"></video>
+              <canvas id="cam2"></canvas>
+              <div class="cam-badges">
+                <span class="cam-badge rec" id="rec2">● SIM</span>
+                <span class="cam-badge btn" id="btnCam" onclick="toggleCam()">📷 Laptop</span>
+              </div>
+              <div class="cam-ts" id="camTs2">--</div>
+            </div>
+          </div>
+          <div class="cam-box">
+            <div class="cam-label"><span class="dot r"></span> CAM 03 · PATIO</div>
+            <div class="cam-wrap">
+              <canvas id="cam3"></canvas>
+              <div class="cam-badges"><span class="cam-badge rec">● SIM</span></div>
+              <div class="cam-ts" id="camTs3">--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="maps-card">
+        <div class="dev-title">Ubicación en tiempo real</div>
+        <div class="maps-grid">
+
+          <!-- MAPA iPHONE -->
+          <div class="map-box">
+            <div class="map-label">📍 iPhone <span class="map-tag" id="locTag" style="color:var(--blue);">EN CASA</span></div>
+            <div class="map-area">
+              <div id="mapCanvas"></div>
+              <div class="map-badge" id="locBadge">🏠 Av. Maipú 2502</div>
+            </div>
+            <div class="map-input-row">
+              <input id="gmapsInput" type="text" placeholder="link maps iPhone...">
+              <button class="btn-ver" onclick="abrirMapa()">Ver</button>
+              <button class="btn-casa" onclick="volverACasa()">🏠</button>
+            </div>
+          </div>
+
+          <!-- MAPA AUTO -->
+          <div class="map-box">
+            <div class="map-label">🚗 Auto <span class="map-tag" id="carTag" style="color:var(--purple);">ESTACIONADO</span></div>
+            <div class="map-area">
+              <div id="carMapCanvas"></div>
+              <div class="map-badge" id="carBadge">🚗 Av. Maipú 2502</div>
+            </div>
+            <div class="map-input-row">
+              <input id="carInput" type="text" placeholder="link GPS auto...">
+              <button class="btn-ver" onclick="abrirMapaAuto()">Ver</button>
+              <button class="btn-casa" onclick="volverAutoCasa()">🅿️</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- DERECHA: dispositivos -->
+    <div class="right-col">
+      <div class="dev-card">
+        <div class="dev-title">Dispositivos</div>
+        <div class="ctrl" id="cLuz">
+          <div><div class="ctrl-name">💡 Luz principal</div><div class="ctrl-st" id="stLuz">Apagada</div></div>
+          <label class="tog"><input type="checkbox" onchange="tog(this,'Luz','f');dibujarPlano()"><div class="tog-track"></div></label>
+        </div>
+        <div class="ctrl" id="cCocina">
+          <div><div class="ctrl-name">💡 Cocina</div><div class="ctrl-st" id="stCocina">Apagada</div></div>
+          <label class="tog"><input type="checkbox" onchange="tog(this,'Cocina','f');dibujarPlano()"><div class="tog-track"></div></label>
+        </div>
+        <div class="ctrl" id="cSala">
+          <div><div class="ctrl-name">💡 Sala</div><div class="ctrl-st" id="stSala">Apagada</div></div>
+          <label class="tog"><input type="checkbox" onchange="tog(this,'Sala','f');dibujarPlano()"><div class="tog-track"></div></label>
+        </div>
+        <div class="ctrl" id="cBano">
+          <div><div class="ctrl-name">💡 Baño</div><div class="ctrl-st" id="stBano">Apagada</div></div>
+          <label class="tog"><input type="checkbox" onchange="tog(this,'Bano','f');dibujarPlano()"><div class="tog-track"></div></label>
+        </div>
+        <div class="ctrl" id="cAire" style="flex-direction:column;align-items:stretch;">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div><div class="ctrl-name">❄️ Aire acond.</div><div class="ctrl-st" id="stAire">Apagado</div></div>
+            <label class="tog"><input type="checkbox" onchange="tog(this,'Aire','m');toggleAirePanel();dibujarPlano()"><div class="tog-track"></div></label>
+          </div>
+          <div id="airePanel">
+            <button class="ac-btn" onclick="cambiarTempAC(-1)">−</button>
+            <div style="flex:1;text-align:center;"><span id="acTempVal" style="font-size:1rem;font-weight:700;color:#2563eb;">24</span><span style="font-size:0.62rem;color:var(--muted);">°C</span></div>
+            <button class="ac-btn" onclick="cambiarTempAC(1)">+</button>
+          </div>
+        </div>
+        <div class="ctrl" id="cAlarma">
+          <div><div class="ctrl-name">🌡️ Temp. ambiente AC</div><div class="ctrl-st" id="stAlarma">--°C</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ASISTENTE BAR -->
+  <div class="assistant-bar" id="aBar"><span id="aBarText">...</span></div>
+
+  <!-- CAM FULLSCREEN -->
+  <div class="cam-fullscreen" id="camFS">
+    <div class="cam-fs-header">
+      <span class="cam-fs-title" id="fsTitle">CAM 01</span>
+      <button class="cam-fs-close" onclick="closeCamFS()">✕ Cerrar</button>
+    </div>
+    <div class="cam-fs-body" id="fsCamBody"></div>
+  </div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
+<script>
+// ── RELOJ + FECHA ──
+function tick(){
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('es-AR',{hour12:false});
+  document.getElementById('fecha').textContent=n.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'});
+  document.getElementById('camTs1').textContent=n.toLocaleString('es-AR');
+  document.getElementById('camTs2').textContent=n.toLocaleString('es-AR');
+  document.getElementById('camTs3').textContent=n.toLocaleString('es-AR');
+}
+setInterval(tick,1000); tick();
+
+// ── CÁMARAS ──
+let camTuyaActiva = false;
+let realCam = false;
+const c1=document.getElementById('cam1'),x1=c1.getContext('2d');
+const c2=document.getElementById('cam2'),x2=c2.getContext('2d');
+const c3=document.getElementById('cam3'),x3=c3.getContext('2d');
+const vid=document.getElementById('camVideo');
+
+function sizeCams(){
+  [c1,c2,c3].forEach(c=>{
+    c.width=c.parentElement.clientWidth||320;
+    c.height=c.parentElement.clientHeight||180;
+  });
+}
+window.addEventListener('resize',sizeCams);
+setTimeout(sizeCams,100);
+
+let b1=Array.from({length:4},()=>({x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*.002,vy:(Math.random()-.5)*.002,r:.05+Math.random()*.07}));
+let b2=Array.from({length:3},()=>({x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*.0015,vy:(Math.random()-.5)*.0015,r:.05+Math.random()*.06}));
+let b3=Array.from({length:3},()=>({x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*.0018,vy:(Math.random()-.5)*.0018,r:.05+Math.random()*.06}));
+
+function feed(c,ctx,blobs,bg){
+  const W=c.width,H=c.height; if(!W||!H)return;
+  ctx.fillStyle=bg; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.025)'; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=45){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=45){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  blobs.forEach(b=>{
+    b.x+=b.vx; b.y+=b.vy;
+    if(b.x<0||b.x>1)b.vx*=-1; if(b.y<0||b.y>1)b.vy*=-1;
+    const g=ctx.createRadialGradient(b.x*W,b.y*H,0,b.x*W,b.y*H,b.r*W);
+    g.addColorStop(0,'rgba(255,255,255,0.07)'); g.addColorStop(1,'transparent');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(b.x*W,b.y*H,b.r*W,0,Math.PI*2); ctx.fill();
+  });
+  const id=ctx.getImageData(0,0,W,H);
+  for(let i=0;i<800;i++){const p=(Math.random()*W|0)+(Math.random()*H|0)*W;const v=Math.random()*15;id.data[p*4]=id.data[p*4+1]=id.data[p*4+2]=v;id.data[p*4+3]=255;}
+  ctx.putImageData(id,0,0);
+}
+
+function loop(){
+  if(!camTuyaActiva) feed(c1,x1,b1,'#080808');
+  if(!realCam) feed(c2,x2,b2,'#100e08');
+  feed(c3,x3,b3,'#0a0c10');
+  requestAnimationFrame(loop);
+}
+loop();
+
+async function toggleCam(){
+  if(!realCam){
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720}},audio:true});
+      vid.srcObject=s; vid.muted=false; vid.style.display='block'; c2.style.display='none';
+      realCam=true;
+      document.getElementById('rec2').textContent='● REC';
+      document.getElementById('btnCam').textContent='🔲 Sim';
+    }catch(e){
+      // si falla con audio (algunos navegadores/dispositivos sin mic disponible), reintenta solo video
+      try{
+        const s2=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720}},audio:false});
+        vid.srcObject=s2; vid.style.display='block'; c2.style.display='none';
+        realCam=true;
+        document.getElementById('rec2').textContent='● REC (sin audio)';
+        document.getElementById('btnCam').textContent='🔲 Sim';
+      }catch(e2){
+        alert('Abrí el archivo localmente en tu laptop.');
+      }
+    }
+  } else {
+    const s=vid.srcObject; if(s)s.getTracks().forEach(t=>t.stop());
+    vid.srcObject=null; vid.style.display='none'; c2.style.display='block';
+    realCam=false;
+    document.getElementById('rec2').textContent='● SIM';
+    document.getElementById('btnCam').textContent='📷 Laptop';
+  }
+}
+
+// ── CÁMARA TUYA EN VIVO (HLS) ──
+const TUYA_PROXY = 'http://localhost:8787';
+const TUYA_CAM_ID = 'eb87499c7364fc2d81acb3';
+let hlsPlayer = null;
+
+async function verCamTuya(){
+  const video = document.getElementById('camTuya');
+  const canvas = document.getElementById('cam1');
+  const btn = document.getElementById('btnTuya');
+  const rec = document.getElementById('rec1');
+
+  if(camTuyaActiva){
+    if(hlsPlayer){ hlsPlayer.destroy(); hlsPlayer = null; }
+    video.src = ''; video.style.display = 'none';
+    canvas.style.display = 'block';
+    camTuyaActiva = false;
+    btn.textContent = '▶ En vivo';
+    rec.textContent = '● SIM';
+    return;
+  }
+
+  btn.textContent = '⏳...';
+  try{
+    const r = await fetch(`${TUYA_PROXY}/stream/${TUYA_CAM_ID}`);
+    const data = await r.json();
+    const url = data?.result?.url;
+    if(!url) throw new Error('Sin URL de stream');
+
+    canvas.style.display = 'none';
+    video.style.display = 'block';
+
+    if(Hls.isSupported()){
+      hlsPlayer = new Hls();
+      hlsPlayer.loadSource(url);
+      hlsPlayer.attachMedia(video);
+    } else if(video.canPlayType('application/vnd.apple.mpegurl')){
+      video.src = url;
+    }
+    camTuyaActiva = true;
+    btn.textContent = '🔲 Sim';
+    rec.textContent = '● LIVE';
+  }catch(e){
+    btn.textContent = '▶ En vivo';
+    console.error('Error cámara Tuya:', e.message);
+  }
+}
+
+// ── CLIMA INTERIOR SIMULADO ──
+let bT=22.4,bH=58;
+setInterval(()=>{
+  bT=Math.max(18,Math.min(34,bT+(Math.random()-.5)*.3));
+  bH=Math.max(30,Math.min(88,bH+(Math.random()-.5)*.8));
+  document.getElementById('tInt').textContent=`${bT.toFixed(1)}°`;
+  document.getElementById('hInt').textContent=Math.round(bH);
+},5000);
+
+// ── SENSOR SALA ──
+let salaTemp=23, acTemp=24;
+setInterval(()=>{
+  salaTemp=Math.max(2,Math.min(38,salaTemp+(Math.random()-.5)*0.6));
+  document.getElementById('tSala').textContent=`${salaTemp.toFixed(1)}°`;
+  const sub=document.getElementById('tSalaSub');
+  const card=document.querySelector('.stat-card.orange');
+  if(salaTemp>30){ sub.textContent='⚠ muy caluroso'; card.style.borderLeftColor='#e03e3e'; }
+  else if(salaTemp>20){ sub.textContent='rango cálido'; card.style.borderLeftColor='#f08c1e'; }
+  else if(salaTemp>10){ sub.textContent='rango fresco'; card.style.borderLeftColor='#2563eb'; }
+  else { sub.textContent='⚠ muy frío'; card.style.borderLeftColor='#0d32a0'; }
+  dibujarPlano();
+},6000);
+
+function toggleAirePanel(){
+  document.getElementById('airePanel').style.display = estaOn('Aire') ? 'flex' : 'none';
+}
+function cambiarTempAC(d){
+  acTemp=Math.max(16,Math.min(30,acTemp+d));
+  const el=document.getElementById('acTempVal');
+  el.textContent=acTemp;
+  el.style.color=colorTempAC(acTemp);
+  dibujarPlano();
+}
+function colorTempAC(t){
+  const f=(t-16)/14;
+  if(f<0.5){
+    const r=Math.round(37+f*2*193),g=Math.round(99+f*2*27),b=Math.round(235-f*2*201);
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const f2=(f-0.5)*2;
+    return `rgb(${Math.min(255,Math.round(260-f2*38))},${Math.round(126-f2*69)},${Math.round(34+f2*9)})`;
+  }
+}
+function colorSala(t){
+  if(t>30) return {fill:'rgba(224,62,62,0.25)',border:'rgba(224,62,62,0.7)',text:'#8c2318'};
+  if(t>20) return {fill:'rgba(240,140,30,0.22)',border:'rgba(240,140,30,0.7)',text:'#9c5210'};
+  if(t>10) return {fill:'rgba(37,99,235,0.18)',border:'rgba(37,99,235,0.6)',text:'#1a4cb0'};
+  return {fill:'rgba(13,50,160,0.32)',border:'rgba(13,50,160,0.85)',text:'#0d2f8c'};
+}
+
+// ── PLANO ──
+const plano=document.getElementById('planoCanvas');
+const pctx=plano.getContext('2d');
+
+function estaOn(name){
+  const cb=document.querySelector(`#c${name} input[type=checkbox]`);
+  return cb?cb.checked:false;
+}
+
+function dibujarPlano(){
+  const wrap=plano.parentElement;
+  plano.width=wrap.clientWidth-24;
+  plano.height=Math.max(wrap.clientHeight-40,140);
+  const W=plano.width,H=plano.height;
+  pctx.clearRect(0,0,W,H);
+
+  const m=6;
+  const habitaciones={
+    patio1:{x:0.00,y:0.00,w:0.25,h:0.30,label:'Patio',luz:null},
+    bano:{x:0.25,y:0.00,w:0.22,h:0.30,label:'Baño',luz:'Bano'},
+    patio2:{x:0.00,y:0.30,w:0.25,h:0.35,label:'Patio 2',luz:null},
+    cuarto:{x:0.47,y:0.00,w:0.53,h:0.65,label:'Cuarto',luz:'Luz'},
+    pasillo:{x:0.25,y:0.30,w:0.22,h:0.35,label:'',luz:null},
+    cocina:{x:0.00,y:0.65,w:0.45,h:0.35,label:'Cocina',luz:'Cocina'},
+    sala:{x:0.45,y:0.65,w:0.55,h:0.35,label:'Sala',luz:'Sala'},
+  };
+  const px=v=>m+v*(W-2*m), py=v=>m+v*(H-2*m), pw=v=>v*(W-2*m), ph=v=>v*(H-2*m);
+
+  for(const [key,r] of Object.entries(habitaciones)){
+    const x=px(r.x),y=py(r.y),w=pw(r.w),h=ph(r.h);
+    let on=r.luz?estaOn(r.luz):false;
+
+    if(key==='sala'){
+      const cs=colorSala(salaTemp);
+      pctx.fillStyle=cs.fill; pctx.fillRect(x,y,w,h);
+      if(on){
+        const g=pctx.createRadialGradient(x+w/2,y+h/2,2,x+w/2,y+h/2,Math.max(w,h)/1.4);
+        g.addColorStop(0,'rgba(255,210,90,0.30)'); g.addColorStop(1,'transparent');
+        pctx.fillStyle=g; pctx.fillRect(x,y,w,h);
+      }
+      pctx.strokeStyle=cs.border; pctx.lineWidth=1.5; pctx.strokeRect(x,y,w,h);
+      pctx.fillStyle=cs.text;
+      pctx.font=`600 ${Math.max(8,W*0.040)}px Inter,sans-serif`;
+      pctx.textAlign='center'; pctx.textBaseline='middle';
+      pctx.fillText('Sala',x+w/2,y+h/2-9);
+      pctx.font=`700 ${Math.max(10,W*0.050)}px Inter,sans-serif`;
+      pctx.fillText(`${salaTemp.toFixed(1)}°`,x+w/2,y+h/2+6);
+      continue;
+    }
+
+    if(on){ pctx.fillStyle='rgba(255,200,60,0.30)'; }
+    else { pctx.fillStyle=key.startsWith('patio')?'rgba(140,180,140,0.10)':'rgba(0,0,0,0.025)'; }
+    pctx.fillRect(x,y,w,h);
+    if(on){
+      const g=pctx.createRadialGradient(x+w/2,y+h/2,2,x+w/2,y+h/2,Math.max(w,h)/1.4);
+      g.addColorStop(0,'rgba(255,210,90,0.35)'); g.addColorStop(1,'transparent');
+      pctx.fillStyle=g; pctx.fillRect(x,y,w,h);
+    }
+    pctx.strokeStyle=on?'rgba(220,160,30,0.7)':'#c8c8c4';
+    pctx.lineWidth=on?1.5:1;
+    pctx.strokeRect(x,y,w,h);
+    if(r.label){
+      pctx.fillStyle=on?'#8a6210':'#9a9a96';
+      pctx.font=`600 ${Math.max(8,W*0.040)}px Inter,sans-serif`;
+      pctx.textAlign='center'; pctx.textBaseline='middle';
+      pctx.fillText(r.label,x+w/2,y+h/2+(r.luz||key==='cuarto'?-5:0));
+    }
+    if(r.luz){
+      pctx.font=`${Math.max(9,W*0.045)}px sans-serif`;
+      pctx.fillText(on?'💡':'·',x+w/2,y+h/2+Math.max(8,H*0.07));
+    }
+  }
+
+  // AIRE
+  const c=habitaciones.cuarto;
+  if(estaOn('Aire')){
+    const acColor=colorTempAC(acTemp);
+    const ax=px(c.x)+pw(c.w)*0.78, ay=py(c.y)+ph(c.h)*0.22;
+    pctx.strokeStyle=acColor.replace('rgb','rgba').replace(')',',0.4)');
+    pctx.lineWidth=1;
+    [5,9,13].forEach(r=>{pctx.beginPath();pctx.arc(ax,ay,r,0,Math.PI*2);pctx.stroke();});
+    pctx.fillStyle=acColor;
+    pctx.beginPath();pctx.arc(ax,ay,3.5,0,Math.PI*2);pctx.fill();
+    pctx.font=`700 ${Math.max(8,W*0.038)}px Inter,sans-serif`;
+    pctx.textAlign='center';
+    pctx.fillText(`${acTemp}°`,ax,ay-17);
+  }
+
+  // CÁMARAS
+  const c1x=px(1.0)-2, c1y=py(c.y)+ph(c.h)*0.85;
+  pctx.fillStyle='#e03e3e';
+  pctx.beginPath();pctx.arc(c1x,c1y,4,0,Math.PI*2);pctx.fill();
+  pctx.strokeStyle='rgba(224,62,62,0.35)';
+  pctx.beginPath();pctx.arc(c1x,c1y,8,0,Math.PI*2);pctx.stroke();
+  pctx.fillStyle='#e03e3e';
+  pctx.font=`600 ${Math.max(7,W*0.032)}px JetBrains Mono,monospace`;
+  pctx.fillText('CAM1',c1x-15,c1y-10);
+
+  const s={x:0.45,y:0.65,w:0.55,h:0.35};
+  const c2x=px(s.x)+pw(s.w)*0.82, c2y=py(s.y)+ph(s.h)*0.30;
+  pctx.fillStyle='#f08c1e';
+  pctx.beginPath();pctx.arc(c2x,c2y,4,0,Math.PI*2);pctx.fill();
+  pctx.strokeStyle='rgba(240,140,30,0.35)';
+  pctx.beginPath();pctx.arc(c2x,c2y,8,0,Math.PI*2);pctx.stroke();
+  pctx.fillStyle='#f08c1e';
+  pctx.fillText('CAM2',c2x,c2y-10);
+
+  const p1={x:0.00,y:0.00,w:0.25,h:0.30};
+  const c3x=px(p1.x)+pw(p1.w)*0.2, c3y=py(p1.y)+ph(p1.h)*0.2;
+  pctx.fillStyle='#7b2fbf';
+  pctx.beginPath();pctx.arc(c3x,c3y,4,0,Math.PI*2);pctx.fill();
+  pctx.strokeStyle='rgba(123,47,191,0.35)';
+  pctx.beginPath();pctx.arc(c3x,c3y,8,0,Math.PI*2);pctx.stroke();
+  pctx.fillStyle='#7b2fbf';
+  pctx.fillText('CAM3',c3x+18,c3y+2);
+}
+window.addEventListener('resize',dibujarPlano);
+setTimeout(dibujarPlano,200);
+
+// ── MAPA UBICACIÓN iPHONE ──
+const iphoneMap=L.map('mapCanvas',{center:[-34.5150,-58.4942],zoom:15,zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(iphoneMap);
+const pingIcon=L.divIcon({html:`<div style="width:12px;height:12px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 0 0 4px rgba(37,99,235,0.2),0 1px 4px rgba(0,0,0,0.3);"></div>`,iconSize:[12,12],iconAnchor:[6,6],className:''});
+L.marker([-34.5150,-58.4942],{icon:pingIcon}).addTo(iphoneMap);
+setTimeout(()=>iphoneMap.invalidateSize(),300);
+
+function abrirMapa(){
+  const url=document.getElementById('gmapsInput').value.trim() || 'https://www.google.com/maps/@-34.5126491,-58.5007415,2017m/data=!3m2!1e3!4b1!4m5!7m4!1m2!1s117138198603674998208!2sEggHBlPp0wOoqw%3D%3D!2e2!13s101955628883872659485?authuser=1&entry=ttu';
+  window.open(url,'_blank');
+  document.getElementById('locTag').textContent='EN VIVO';
+  document.getElementById('locTag').style.color='var(--green)';
+  document.getElementById('locBadge').textContent='📍 En movimiento';
+}
+function volverACasa(){
+  document.getElementById('gmapsInput').value='';
+  document.getElementById('locTag').textContent='EN CASA';
+  document.getElementById('locTag').style.color='var(--blue)';
+  document.getElementById('locBadge').textContent='🏠 Av. Maipú 2502';
+}
+
+// ── MAPA UBICACIÓN AUTO ──
+const carMap=L.map('carMapCanvas',{center:[-34.5150,-58.4942],zoom:15,zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,touchZoom:false});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:18}).addTo(carMap);
+const carIcon=L.divIcon({html:`<div style="width:12px;height:12px;border-radius:50%;background:#7b2fbf;border:2px solid #fff;box-shadow:0 0 0 4px rgba(123,47,191,0.2),0 1px 4px rgba(0,0,0,0.3);"></div>`,iconSize:[12,12],iconAnchor:[6,6],className:''});
+L.marker([-34.5150,-58.4942],{icon:carIcon}).addTo(carMap);
+setTimeout(()=>carMap.invalidateSize(),300);
+
+function abrirMapaAuto(){
+  const url=document.getElementById('carInput').value.trim();
+  if(!url){ alert('Pegá el link de ubicación del GPS del auto'); return; }
+  window.open(url,'_blank');
+  document.getElementById('carTag').textContent='EN MOVIMIENTO';
+  document.getElementById('carTag').style.color='var(--green)';
+  document.getElementById('carBadge').textContent='🚗 En movimiento';
+}
+function volverAutoCasa(){
+  document.getElementById('carInput').value='';
+  document.getElementById('carTag').textContent='ESTACIONADO';
+  document.getElementById('carTag').style.color='var(--purple)';
+  document.getElementById('carBadge').textContent='🚗 Av. Maipú 2502';
+}
+
+// ── FONDO LED SEGÚN CLIMA ──
+const ledBg=document.getElementById('ledWeatherBg');
+const lctx=ledBg.getContext('2d');
+let climaActual='cargando';
+function sizeLedBg(){ledBg.width=ledBg.parentElement.clientWidth;ledBg.height=ledBg.parentElement.clientHeight;}
+sizeLedBg(); window.addEventListener('resize',sizeLedBg);
+
+let gotas=Array.from({length:60},()=>({x:Math.random(),y:Math.random(),v:0.015+Math.random()*0.02,l:4+Math.random()*5}));
+let nubes=Array.from({length:6},()=>({x:Math.random()*1.4-0.2,y:Math.random(),v:0.0006+Math.random()*0.0008,w:0.12+Math.random()*0.15}));
+let solAng=0;
+
+function drawLedBg(){
+  const W=ledBg.width,H=ledBg.height;
+  if(!W||!H){requestAnimationFrame(drawLedBg);return;}
+  if(climaActual==='lluvia'){
+    const g=lctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#0d1b2e');g.addColorStop(1,'#0a0e14');
+    lctx.fillStyle=g;lctx.fillRect(0,0,W,H);
+    lctx.strokeStyle='rgba(110,160,255,0.45)';lctx.lineWidth=1;
+    gotas.forEach(go=>{
+      go.y+=go.v;go.x-=go.v*0.25;
+      if(go.y>1){go.y=-0.05;go.x=Math.random()*1.1;}
+      lctx.beginPath();lctx.moveTo(go.x*W,go.y*H);lctx.lineTo(go.x*W-go.l*0.4,go.y*H+go.l);lctx.stroke();
+    });
+  } else if(climaActual==='sol'){
+    const g=lctx.createLinearGradient(0,0,W,0);
+    g.addColorStop(0,'#1a1206');g.addColorStop(0.5,'#241804');g.addColorStop(1,'#1a1206');
+    lctx.fillStyle=g;lctx.fillRect(0,0,W,H);
+    solAng+=0.005;
+    const sx=W*0.06,sy=H/2;
+    lctx.save();lctx.translate(sx,sy);lctx.rotate(solAng);
+    lctx.strokeStyle='rgba(255,200,60,0.5)';lctx.lineWidth=1.5;
+    for(let i=0;i<8;i++){lctx.rotate(Math.PI/4);lctx.beginPath();lctx.moveTo(8,0);lctx.lineTo(13,0);lctx.stroke();}
+    lctx.restore();
+    const sg=lctx.createRadialGradient(sx,sy,1,sx,sy,8);
+    sg.addColorStop(0,'rgba(255,220,100,0.95)');sg.addColorStop(1,'rgba(255,180,40,0.5)');
+    lctx.fillStyle=sg;lctx.beginPath();lctx.arc(sx,sy,6,0,Math.PI*2);lctx.fill();
+    const amb=lctx.createRadialGradient(sx,sy,5,sx,sy,W*0.25);
+    amb.addColorStop(0,'rgba(255,190,50,0.12)');amb.addColorStop(1,'transparent');
+    lctx.fillStyle=amb;lctx.fillRect(0,0,W,H);
+  } else if(climaActual==='nublado'){
+    const g=lctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#161c26');g.addColorStop(1,'#0e1218');
+    lctx.fillStyle=g;lctx.fillRect(0,0,W,H);
+    nubes.forEach(n=>{
+      n.x+=n.v; if(n.x>1.25)n.x=-0.3;
+      const nx=n.x*W,ny=n.y*H*0.6+H*0.2,nw=n.w*W;
+      lctx.fillStyle='rgba(140,155,175,0.18)';
+      lctx.beginPath();
+      lctx.arc(nx,ny,nw*0.18,0,Math.PI*2);
+      lctx.arc(nx+nw*0.22,ny-2,nw*0.22,0,Math.PI*2);
+      lctx.arc(nx+nw*0.45,ny,nw*0.17,0,Math.PI*2);
+      lctx.fill();
+    });
+  } else { lctx.fillStyle='#0a0e14';lctx.fillRect(0,0,W,H); }
+  requestAnimationFrame(drawLedBg);
+}
+drawLedBg();
+
+// ── CINTA LED TEXTO ──
+let datosLed={tExt:null,hExt:null,consejo:'',tMax:null,tMin:null,lluvia:null};
+let datosDolar=null;
+
+function cargarDolar(){
+  fetch('https://dolarapi.com/v1/dolares/oficial')
+    .then(r=>r.json())
+    .then(d=>{
+      datosDolar = `DOLAR OFICIAL COMPRA ${Math.round(d.compra)} / VENTA ${Math.round(d.venta)}`;
+      actualizarLed();
+    })
+    .catch(()=>{});
+}
+cargarDolar();
+setInterval(cargarDolar, 10*60*1000);
+
+function actualizarLed(){
+  const p=[];
+  p.push('● KEY/ROY HOME');
+  p.push(`HORA ${new Date().toLocaleTimeString('es-AR',{hour12:false})}`);
+  if(datosLed.tExt!==null){
+    p.push(`EXTERIOR ${datosLed.tExt.toFixed(1)}°C · HUM ${datosLed.hExt}%`);
+    p.push(`MAX ${Math.round(datosLed.tMax)}° / MIN ${Math.round(datosLed.tMin)}°`);
+    p.push(`LLUVIA ${datosLed.lluvia}%`);
+    p.push(datosLed.consejo.toUpperCase());
+  } else { p.push('CONECTANDO CLIMA...'); }
+  p.push(`INTERIOR ${bT.toFixed(1)}°C`);
+  p.push(`SALA ${salaTemp.toFixed(1)}°C`);
+  const devs=[['Luz','LUZ CUARTO'],['Cocina','COCINA'],['Sala','SALA'],['Bano','BAÑO'],['Aire','AIRE'],['Alarma','ALARMA']];
+  const on=devs.filter(([k])=>estaOn(k)).map(([,n])=>n);
+  p.push(on.length?`ENCENDIDOS: ${on.join(', ')}`:'TODO APAGADO');
+  if(estaOn('Aire'))p.push(`AC ${acTemp}°C`);
+
+  const sep = '   ···   ';
+  let html = p.map(x=>esc(x)).join(sep);
+  if(datosDolar){
+    html += sep + `<span class="led-dolar">${esc(datosDolar)}</span>`;
+  } else {
+    html += sep + `<span class="led-dolar">CARGANDO DOLAR...</span>`;
+  }
+  document.getElementById('ledText').innerHTML = html;
+}
+function esc(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+setInterval(actualizarLed,8000);
+setTimeout(actualizarLed,1000);
+
+// ── CLIMA REAL + CONSEJO ──
+function cargarClima(intento=1){
+  fetch('https://api.open-meteo.com/v1/forecast?latitude=-34.603&longitude=-58.381&current=temperature_2m,relative_humidity_2m,cloud_cover,precipitation&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum&timezone=America/Argentina/Buenos_Aires&forecast_days=1')
+  .then(r=>r.json()).then(d=>{
+    const t=d.current.temperature_2m,h=d.current.relative_humidity_2m;
+    document.getElementById('tExt').textContent=`${t.toFixed(1)}°`;
+    document.getElementById('hExt').textContent=h;
+    document.getElementById('extTempHeaderVal').textContent=`${t.toFixed(1)}°C`;
+
+    const tMax=d.daily.temperature_2m_max[0],tMin=d.daily.temperature_2m_min[0];
+    const probLluvia=d.daily.precipitation_probability_max[0],mmLluvia=d.daily.precipitation_sum[0];
+    const llueve=probLluvia>=60||mmLluvia>=3;
+    const llovizna=(probLluvia>=30&&probLluvia<60)||(mmLluvia>0&&mmLluvia<3);
+    const calor=tMax>=28, frio=tMax<=14, muchoFrio=tMax<=8;
+
+    let icon,titulo,texto;
+    if(muchoFrio&&llueve){icon='🥶';titulo='Hoy hará mucho frío y llueve';texto='Abrigate bien y sacá el paraguas';}
+    else if(muchoFrio){icon='🧥';titulo='Hoy hará mucho frío';texto='Abrigate bien antes de salir';}
+    else if(frio&&llueve){icon='🌧️';titulo='Hoy hace frío y llueve';texto='Abrigo y paraguas, no te olvides';}
+    else if(calor&&llueve){icon='⛈️';titulo='Hoy hace calor y llueve';texto='Llueve: sacá el paraguas';}
+    else if(llueve){icon='☔';titulo='Hoy llueve';texto='Sacá el paraguas antes de salir';}
+    else if(llovizna){icon='🌦️';titulo='Hoy puede lloviznar';texto='Por las dudas, llevate el paraguas';}
+    else if(calor){icon='☀️';titulo='Hoy hace calor y no llueve';texto='Día ideal, hidratate bien';}
+    else if(frio){icon='🧣';titulo='Hoy hace frío pero no llueve';texto='Abrigate, sin paraguas necesario';}
+    else {icon='😎';titulo='Hoy no llueve';texto='Día templado y tranquilo';}
+
+    document.getElementById('consejoIcon').textContent=icon;
+    document.getElementById('consejoTitulo').textContent=titulo;
+    document.getElementById('consejoTexto').textContent=`${texto} · Máx ${Math.round(tMax)}° Mín ${Math.round(tMin)}° · Lluvia ${probLluvia}%`;
+
+    datosLed={tExt:t,hExt:h,consejo:`${titulo} — ${texto}`,tMax,tMin,lluvia:probLluvia};
+    actualizarLed();
+
+    const lloviendoAhora=(d.current.precipitation||0)>0;
+    const nubesAhora=d.current.cloud_cover||0;
+    if(lloviendoAhora||llueve){climaActual='lluvia';}
+    else if(nubesAhora>=60){climaActual='nublado';}
+    else {climaActual='sol';}
+  }).catch(()=>{
+    if(intento<3){
+      setTimeout(()=>cargarClima(intento+1),5000);
+      document.getElementById('consejoTitulo').textContent='Reintentando conexión...';
+      document.getElementById('consejoIcon').textContent='🔄';
+    } else {
+      document.getElementById('consejoTitulo').textContent='Sin datos del clima';
+      document.getElementById('consejoTexto').textContent='Funciona al abrir en tu laptop';
+      document.getElementById('consejoIcon').textContent='⚠️';
+    }
+  });
+}
+cargarClima();
+setInterval(()=>cargarClima(),30*60*1000);
+
+// ── TUYA REAL (via proxy local) ──
+const TUYA_DEVICES = {
+  Luz:  { id:'ebfbefac94bdc9301fuchl', code:'switch_led' },
+  Aire: { id:'6000051778ee4c84805e',  code:'switch' },
+};
+
+async function tuyaCmd(name, on){
+  const dev = TUYA_DEVICES[name];
+  if(!dev) return;
+  try{
+    await fetch(`${TUYA_PROXY}/cmd/${dev.id}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({code:dev.code, value:on})
+    });
+  }catch(e){}
+}
+
+async function tuyaPoll(){
+  for(const [name,dev] of Object.entries(TUYA_DEVICES)){
+    try{
+      const r = await fetch(`${TUYA_PROXY}/status/${dev.id}`);
+      const st = await r.json();
+      if(Array.isArray(st)){
+        const sw = st.find(s=>s.code===dev.code);
+        if(sw){
+          const cb=document.querySelector(`#c${name} input[type=checkbox]`);
+          if(cb && cb.checked!==sw.value){
+            cb.checked=sw.value;
+            const gen = name==='Aire'?'m':'f';
+            const labels={f:['Encendida','Apagada'],m:['Encendido','Apagado']};
+            document.getElementById('st'+name).textContent=sw.value?labels[gen][0]:labels[gen][1];
+            document.getElementById('st'+name).className='ctrl-st'+(sw.value?' on':'');
+            dibujarPlano();
+          }
+        }
+        // Temperatura ambiente que mide el propio aire Tuya
+        if(name==='Aire'){
+          const tempStat = st.find(s=>s.code==='temp_current'||s.code==='temp_set'||s.code==='va_temperature');
+          if(tempStat){
+            let t = tempStat.value;
+            if(t>100) t = t/10; // algunos Tuya reportan en décimas
+            actualizarTempAireReal(t);
+          }
+        }
+      }
+    }catch(e){}
+  }
+}
+setInterval(tuyaPoll, 10000);
+setTimeout(tuyaPoll, 2000);
+
+function actualizarTempAireReal(t){
+  const el = document.getElementById('stAlarma');
+  el.textContent = `${t.toFixed(1)}°C`;
+  let color;
+  if(t >= 24){ color = '#f08c1e'; }       // caliente → naranja
+  else if(t <= 18){ color = '#2563eb'; }  // frío → azul
+  else { color = '#8c8a86'; }             // templado → neutro
+  el.style.color = color;
+  el.style.fontWeight = '600';
+}
+
+// ── TOGGLES ──
+function tog(el,name,gen){
+  const on=el.checked;
+  const labels={f:['Encendida','Apagada'],m:['Encendido','Apagado'],a:['Activa','Desactivada']};
+  document.getElementById('st'+name).textContent=on?labels[gen][0]:labels[gen][1];
+  document.getElementById('st'+name).className='ctrl-st'+(on?' on':'');
+  tuyaCmd(name, on);
+  actualizarLed();
+}
+
+// ── ASISTENTE DE VOZ "HOLA ROY" ──
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+let recog=null,aTimer=null,modoContinuo=false,esperandoComando=false,comandoTimer=null;
+
+function showBar(txt,heard=''){
+  const bar=document.getElementById('aBar');
+  document.getElementById('aBarText').innerHTML=heard?`<span class="heard">"${heard}"</span> · ${txt}`:txt;
+  bar.classList.add('show');
+  clearTimeout(aTimer);
+  aTimer=setTimeout(()=>bar.classList.remove('show'),3500);
+}
+function speak(txt){
+  const u=new SpeechSynthesisUtterance(txt);
+  u.lang='es-AR';u.rate=1;u.pitch=1;
+  window.speechSynthesis.speak(u);
+}
+
+function toggleMic(){
+  if(!SpeechRecognition){alert('Usá Chrome o Chromium para el asistente de voz.');return;}
+  modoContinuo=!modoContinuo;
+  if(modoContinuo){
+    iniciarEscucha();
+    document.getElementById('micBtn').classList.add('listening');
+    document.getElementById('micBtn').textContent='👂';
+    showBar('Escucha activa · Decí "Hola Roy" + comando');
+    speak('Escucha activada. Decime Hola Roy y el comando.');
+  } else {
+    detenerEscucha();
+    document.getElementById('micBtn').classList.remove('listening');
+    document.getElementById('micBtn').textContent='🎤';
+    showBar('Escucha desactivada');
+  }
+}
+
+function iniciarEscucha(){
+  recog=new SpeechRecognition();
+  recog.lang='es-AR';recog.continuous=true;recog.interimResults=false;
+  recog.onresult=e=>{
+    const last=e.results[e.results.length-1];
+    if(!last.isFinal)return;
+    const heard=last[0].transcript.trim();
+    const t=heard.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const wake=/hola\s*roy/.test(t);
+    if(wake){
+      const resto=t.replace(/.*hola\s*roy/,'').trim();
+      if(resto.length>3){showBar('Procesando...',heard);handleCmd(resto);}
+      else{
+        esperandoComando=true;
+        showBar('Te escucho... 👂');speak('Te escucho');
+        clearTimeout(comandoTimer);
+        comandoTimer=setTimeout(()=>{esperandoComando=false;showBar('Decí "Hola Roy" de nuevo');},8000);
+      }
+    } else if(esperandoComando){
+      esperandoComando=false;clearTimeout(comandoTimer);
+      showBar('Procesando...',heard);handleCmd(t);
+    }
+  };
+  recog.onerror=e=>{
+    if(e.error==='not-allowed'){
+      showBar('Permiso de micrófono denegado');
+      modoContinuo=false;
+      document.getElementById('micBtn').classList.remove('listening');
+      document.getElementById('micBtn').textContent='🎤';
+    }
+  };
+  recog.onend=()=>{if(modoContinuo){setTimeout(()=>{try{recog.start();}catch(e){}},400);}};
+  try{recog.start();}catch(e){}
+}
+function detenerEscucha(){if(recog){recog.onend=null;recog.stop();}esperandoComando=false;}
+
+function handleCmd(raw){
+  const t=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(/(mostrar|abrir|ver).*(camara|cam).*(calle|exterior|uno|1)/.test(t)||/camara.*(calle|exterior)/.test(t)){openCamFS('cam1','CAM 01 · CALLE');speak('Mostrando cámara calle');return;}
+  if(/(mostrar|abrir|ver).*(camara|cam).*(casa|interior|dos|2)/.test(t)||/camara.*(casa|interior)/.test(t)){openCamFS('cam2','CAM 02 · CASA');speak('Mostrando cámara casa');return;}
+  if(/(mostrar|abrir|ver).*(camara|cam).*(patio|tres|3)/.test(t)){openCamFS('cam3','CAM 03 · PATIO');speak('Mostrando cámara patio');return;}
+  if(/(pantalla completa|fullscreen)/.test(t)){openCamFS('cam1','CAM 01 · CALLE');speak('Pantalla completa');return;}
+  if(/(cerrar|salir|volver|menu|panel)/.test(t)){closeCamFS();speak('Volviendo al panel');return;}
+
+  const luces={'luz principal':['Luz','f'],'luz cocina':['Cocina','f'],'cocina':['Cocina','f'],'luz sala':['Sala','f'],'sala':['Sala','f'],'luz bano':['Bano','f'],'bano':['Bano','f'],'luz':['Luz','f']};
+  const enc=/(encender|prender|activar|enciende|prende|encende)/.test(t);
+  const apa=/(apagar|apaga|desactivar|apague)/.test(t);
+
+  for(const [k,[n,g]] of Object.entries(luces)){
+    if(t.includes(k)){
+      if(enc){setDevice(n,g,true);speak(`${k} encendida`);return;}
+      if(apa){setDevice(n,g,false);speak(`${k} apagada`);return;}
+    }
+  }
+  if(t.includes('aire')||t.includes('acondicionado')){
+    if(enc){setDevice('Aire','m',true);toggleAirePanel();speak('Aire encendido');return;}
+    if(apa){setDevice('Aire','m',false);toggleAirePanel();speak('Aire apagado');return;}
+  }
+  if(t.includes('alarma')){
+    if(enc||t.includes('activ')){setDevice('Alarma','a',true);speak('Alarma activada');return;}
+    if(apa||t.includes('desactiv')){setDevice('Alarma','a',false);speak('Alarma desactivada');return;}
+  }
+  if(/(apagar todo|todo apagado)/.test(t)){
+    ['Luz','Cocina','Sala','Bano'].forEach(n=>setDevice(n,'f',false));
+    setDevice('Aire','m',false);toggleAirePanel();
+    speak('Todo apagado');return;
+  }
+  if(/(encender todo|prender todo)/.test(t)){
+    ['Luz','Cocina','Sala','Bano'].forEach(n=>setDevice(n,'f',true));
+    speak('Todas las luces encendidas');return;
+  }
+  speak('No entendí el comando');
+  showBar('Comando no reconocido',raw);
+}
+
+function setDevice(name,gen,on){
+  const cb=document.querySelector(`#c${name} input[type=checkbox]`);
+  if(!cb)return;
+  cb.checked=on;
+  const labels={f:['Encendida','Apagada'],m:['Encendido','Apagado'],a:['Activa','Desactivada']};
+  document.getElementById('st'+name).textContent=on?labels[gen][0]:labels[gen][1];
+  document.getElementById('st'+name).className='ctrl-st'+(on?' on':'');
+  showBar(on?labels[gen][0]:labels[gen][1],name.toLowerCase());
+  tuyaCmd(name, on);
+  dibujarPlano();
+  actualizarLed();
+}
+
+// ── CAM FULLSCREEN ──
+function openCamFS(canvasId,title){
+  const fs=document.getElementById('camFS');
+  const body=document.getElementById('fsCamBody');
+  document.getElementById('fsTitle').textContent=title;
+  body.innerHTML='';
+  const src=document.getElementById(canvasId);
+  const clone=document.createElement('canvas');
+  clone.style.cssText='width:100%;height:100%;object-fit:cover;';
+  body.appendChild(clone);
+  const clCtx=clone.getContext('2d');
+  function mirror(){
+    if(!fs.classList.contains('show'))return;
+    clone.width=body.clientWidth;clone.height=body.clientHeight;
+    clCtx.drawImage(src,0,0,clone.width,clone.height);
+    requestAnimationFrame(mirror);
+  }
+  fs.classList.add('show');
+  mirror();
+}
+function closeCamFS(){
+  document.getElementById('camFS').classList.remove('show');
+  document.getElementById('fsCamBody').innerHTML='';
+}
+</script>
+</body>
+</html>
