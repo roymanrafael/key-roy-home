@@ -102,6 +102,22 @@
     background:#0a0e14; overflow:hidden; position:relative;
     display:flex; align-items:center;
     border-bottom:1px solid var(--border);
+    transition: box-shadow .3s;
+  }
+  .led-strip.listening {
+    box-shadow: inset 0 0 40px rgba(37,99,235,0.6), 0 0 12px rgba(37,99,235,0.5);
+    animation: led-listen 1.2s ease-in-out infinite;
+  }
+  @keyframes led-listen {
+    0%,100% { box-shadow: inset 0 0 30px rgba(37,99,235,0.4), 0 0 8px rgba(37,99,235,0.4); }
+    50% { box-shadow: inset 0 0 60px rgba(37,99,235,0.8), 0 0 16px rgba(37,99,235,0.7); }
+  }
+  .led-strip.listening::after {
+    content:'🎙 ESCUCHANDO...';
+    position:absolute; right:14px; top:50%; transform:translateY(-50%);
+    font-family:'JetBrains Mono',monospace; font-size:0.65rem; font-weight:700;
+    color:#5b9bff; letter-spacing:0.1em; z-index:5;
+    text-shadow:0 0 8px rgba(37,99,235,0.8);
   }
   #ledWeatherBg { position:absolute; inset:0; z-index:0; pointer-events:none; }
   .led-track { white-space:nowrap; will-change:transform; animation:led-scroll 25s linear infinite; position:relative; z-index:1; }
@@ -204,7 +220,7 @@
     flex:1.15; min-height:0;
     display:flex; flex-direction:column;
   }
-  .cams-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; flex:1; min-height:0; }
+  .cams-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; flex:1; min-height:0; }
   .cam-box { display:flex; flex-direction:column; min-height:0; }
   .cam-label {
     font-family:'JetBrains Mono',monospace;
@@ -344,9 +360,7 @@
     </div>
     <div class="top-right">
       <div class="top-temp">🌡️ <span id="extTempHeaderVal">--°C</span></div>
-      <button class="mic-btn" id="micBtn" onclick="toggleMic()" title="Hola Roy">🎤</button>
-      <span class="user-name">Roy <span>· Administrador</span></span>
-      <div class="avatar">RM</div>
+      <button class="mic-btn" id="micBtn" onclick="toggleMic()" title="Hola Keyth">🎤</button>
     </div>
   </div>
 
@@ -391,18 +405,13 @@
 
     <!-- CENTRO: cámaras + mapas -->
     <div class="center-col">
-      <div class="panel-title-card">
-        <div class="panel-title">dashboard</div>
-        <div class="panel-sub">Resumen operativo en tiempo real · KEY/ROY HOME</div>
-      </div>
-
-      <div class="cams-card">
+      <div class="cams-card" style="flex:1.15;">
         <div class="dev-title">Cámaras de seguridad</div>
         <div class="cams-grid">
           <div class="cam-box">
             <div class="cam-label"><span class="dot g"></span> CAM 01 · CALLE</div>
             <div class="cam-wrap">
-              <video id="camTuya" autoplay playsinline muted style="display:none;"></video>
+              <video id="camTuya" autoplay playsinline style="display:none;"></video>
               <canvas id="cam1"></canvas>
               <div class="cam-badges">
                 <span class="cam-badge rec" id="rec1">● SIM</span>
@@ -414,21 +423,13 @@
           <div class="cam-box">
             <div class="cam-label"><span class="dot o"></span> CAM 02 · CASA</div>
             <div class="cam-wrap">
-              <video id="camVideo" autoplay playsinline muted style="display:none;"></video>
+              <img id="camS9" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;" />
               <canvas id="cam2"></canvas>
               <div class="cam-badges">
                 <span class="cam-badge rec" id="rec2">● SIM</span>
-                <span class="cam-badge btn" id="btnCam" onclick="toggleCam()">📷 Laptop</span>
+                <span class="cam-badge btn" id="btnCam" onclick="toggleCamS9()">📱 S9</span>
               </div>
               <div class="cam-ts" id="camTs2">--</div>
-            </div>
-          </div>
-          <div class="cam-box">
-            <div class="cam-label"><span class="dot r"></span> CAM 03 · PATIO</div>
-            <div class="cam-wrap">
-              <canvas id="cam3"></canvas>
-              <div class="cam-badges"><span class="cam-badge rec">● SIM</span></div>
-              <div class="cam-ts" id="camTs3">--</div>
             </div>
           </div>
         </div>
@@ -539,14 +540,15 @@ setInterval(tick,1000); tick();
 
 // ── CÁMARAS ──
 let camTuyaActiva = false;
-let realCam = false;
+let camS9Activa = false;
 const c1=document.getElementById('cam1'),x1=c1.getContext('2d');
 const c2=document.getElementById('cam2'),x2=c2.getContext('2d');
-const c3=document.getElementById('cam3'),x3=c3.getContext('2d');
-const vid=document.getElementById('camVideo');
+
+// IP de la cámara del Samsung S9 (IP Webcam app)
+const S9_CAM_URL = 'http://192.168.0.50:8080/video';
 
 function sizeCams(){
-  [c1,c2,c3].forEach(c=>{
+  [c1,c2].forEach(c=>{
     c.width=c.parentElement.clientWidth||320;
     c.height=c.parentElement.clientHeight||180;
   });
@@ -556,7 +558,6 @@ setTimeout(sizeCams,100);
 
 let b1=Array.from({length:4},()=>({x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*.002,vy:(Math.random()-.5)*.002,r:.05+Math.random()*.07}));
 let b2=Array.from({length:3},()=>({x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*.0015,vy:(Math.random()-.5)*.0015,r:.05+Math.random()*.06}));
-let b3=Array.from({length:3},()=>({x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*.0018,vy:(Math.random()-.5)*.0018,r:.05+Math.random()*.06}));
 
 function feed(c,ctx,blobs,bg){
   const W=c.width,H=c.height; if(!W||!H)return;
@@ -578,38 +579,33 @@ function feed(c,ctx,blobs,bg){
 
 function loop(){
   if(!camTuyaActiva) feed(c1,x1,b1,'#080808');
-  if(!realCam) feed(c2,x2,b2,'#100e08');
-  feed(c3,x3,b3,'#0a0c10');
+  if(!camS9Activa) feed(c2,x2,b2,'#100e08');
   requestAnimationFrame(loop);
 }
 loop();
 
-async function toggleCam(){
-  if(!realCam){
-    try{
-      const s=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720}},audio:true});
-      vid.srcObject=s; vid.muted=false; vid.style.display='block'; c2.style.display='none';
-      realCam=true;
-      document.getElementById('rec2').textContent='● REC';
-      document.getElementById('btnCam').textContent='🔲 Sim';
-    }catch(e){
-      // si falla con audio (algunos navegadores/dispositivos sin mic disponible), reintenta solo video
-      try{
-        const s2=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720}},audio:false});
-        vid.srcObject=s2; vid.style.display='block'; c2.style.display='none';
-        realCam=true;
-        document.getElementById('rec2').textContent='● REC (sin audio)';
-        document.getElementById('btnCam').textContent='🔲 Sim';
-      }catch(e2){
-        alert('Abrí el archivo localmente en tu laptop.');
-      }
-    }
+// CAM 02 — Samsung S9 vía IP Webcam (MJPEG, solo video)
+function toggleCamS9(){
+  const img = document.getElementById('camS9');
+  const btn = document.getElementById('btnCam');
+  const rec = document.getElementById('rec2');
+  if(!camS9Activa){
+    img.src = S9_CAM_URL;
+    img.style.display = 'block';
+    c2.style.display = 'none';
+    camS9Activa = true;
+    btn.textContent = '🔲 Sim';
+    rec.textContent = '● LIVE';
+    img.onerror = ()=>{
+      img.style.display='none'; c2.style.display='block';
+      camS9Activa=false; btn.textContent='📱 S9'; rec.textContent='● SIM';
+      alert('No se pudo conectar a la cámara del S9 (192.168.0.50:8080). Verificá que IP Webcam esté activa y en la misma red.');
+    };
   } else {
-    const s=vid.srcObject; if(s)s.getTracks().forEach(t=>t.stop());
-    vid.srcObject=null; vid.style.display='none'; c2.style.display='block';
-    realCam=false;
-    document.getElementById('rec2').textContent='● SIM';
-    document.getElementById('btnCam').textContent='📷 Laptop';
+    img.src = ''; img.style.display='none'; c2.style.display='block';
+    camS9Activa = false;
+    btn.textContent = '📱 S9';
+    rec.textContent = '● SIM';
   }
 }
 
@@ -643,13 +639,18 @@ async function verCamTuya(){
 
     canvas.style.display = 'none';
     video.style.display = 'block';
+    video.muted = true;
 
     if(Hls.isSupported()){
       hlsPlayer = new Hls();
       hlsPlayer.loadSource(url);
       hlsPlayer.attachMedia(video);
+      hlsPlayer.on(Hls.Events.MANIFEST_PARSED, ()=>{
+        video.play().catch(()=>{});
+      });
     } else if(video.canPlayType('application/vnd.apple.mpegurl')){
       video.src = url;
+      video.play().catch(()=>{});
     }
     camTuyaActiva = true;
     btn.textContent = '🔲 Sim';
@@ -1154,8 +1155,8 @@ function toggleMic(){
     iniciarEscucha();
     document.getElementById('micBtn').classList.add('listening');
     document.getElementById('micBtn').textContent='👂';
-    showBar('Escucha activa · Decí "Hola Roy" + comando');
-    speak('Escucha activada. Decime Hola Roy y el comando.');
+    showBar('Escucha activa · Decí "Hola Keyth" + comando');
+    speak('Escucha activada. Decime Hola Keyth y el comando.');
   } else {
     detenerEscucha();
     document.getElementById('micBtn').classList.remove('listening');
@@ -1170,6 +1171,9 @@ function iniciarEscucha(){
   recog.onresult=e=>{
     const last=e.results[e.results.length-1];
     if(!last.isFinal)return;
+    // Efecto LED azul al detectar voz
+    document.querySelector('.led-strip').classList.add('listening');
+    setTimeout(()=>document.querySelector('.led-strip').classList.remove('listening'), 1500);
     const heard=last[0].transcript.trim();
     const t=heard.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
     const wake=/hola\s*roy/.test(t);
@@ -1202,9 +1206,46 @@ function detenerEscucha(){if(recog){recog.onend=null;recog.stop();}esperandoComa
 
 function handleCmd(raw){
   const t=raw.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+  // ── IDENTIDAD DE KEYTH (Ticket 7) ──
+  if(/(cuantos anos|que edad|cuando naciste|tu edad)/.test(t)){
+    speak('Nací en 1989 y tengo 37 años'); showBar('Nací en 1989 y tengo 37 años'); return;
+  }
+  if(/(como te llamas|tu nombre|quien eres)/.test(t)){
+    speak('Soy Keyth, tu asistente del hogar'); showBar('Soy Keyth'); return;
+  }
+
+  // ── LECTURA DE TEMPERATURAS (Ticket 9) ──
+  if(/temperatura.*(cuarto|habitacion|pieza|dormitorio)/.test(t)){
+    const tc = bT ? bT.toFixed(1) : '--';
+    speak(`La temperatura del cuarto es de ${tc} grados`); showBar(`Cuarto: ${tc}°C`); return;
+  }
+  if(/temperatura.*(sala|living|comedor)/.test(t)){
+    speak(`La temperatura de la sala es de ${salaTemp.toFixed(1)} grados`); showBar(`Sala: ${salaTemp.toFixed(1)}°C`); return;
+  }
+  if(/temperatura.*(exterior|afuera|calle|fuera)/.test(t)){
+    const te = datosLed.tExt!==null ? datosLed.tExt.toFixed(1) : '--';
+    speak(`La temperatura exterior es de ${te} grados`); showBar(`Exterior: ${te}°C`); return;
+  }
+
+  // ── QUÉ ME PONGO HOY (Ticket 10) ──
+  if(/(que (uso|me pongo|llevo))|que ropa|como me visto/.test(t)){
+    let msg;
+    const te = datosLed.tExt;
+    const lluvia = datosLed.lluvia || 0;
+    if(te===null){ msg='Todavía no tengo los datos del clima de hoy'; }
+    else {
+      if(te <= 10) msg='Hace bastante frío afuera, te recomiendo una campera bien abrigada';
+      else if(te <= 17) msg='Está fresco, llevá un buzo o una campera liviana';
+      else if(te <= 25) msg='Está templado, una remera ligera estará bien';
+      else msg='Hace calor, ropa fresca y liviana';
+      if(lluvia >= 50) msg += '. Y no te olvides el paraguas, hay probabilidad de lluvia';
+    }
+    speak(msg); showBar(msg); return;
+  }
+
   if(/(mostrar|abrir|ver).*(camara|cam).*(calle|exterior|uno|1)/.test(t)||/camara.*(calle|exterior)/.test(t)){openCamFS('cam1','CAM 01 · CALLE');speak('Mostrando cámara calle');return;}
   if(/(mostrar|abrir|ver).*(camara|cam).*(casa|interior|dos|2)/.test(t)||/camara.*(casa|interior)/.test(t)){openCamFS('cam2','CAM 02 · CASA');speak('Mostrando cámara casa');return;}
-  if(/(mostrar|abrir|ver).*(camara|cam).*(patio|tres|3)/.test(t)){openCamFS('cam3','CAM 03 · PATIO');speak('Mostrando cámara patio');return;}
   if(/(pantalla completa|fullscreen)/.test(t)){openCamFS('cam1','CAM 01 · CALLE');speak('Pantalla completa');return;}
   if(/(cerrar|salir|volver|menu|panel)/.test(t)){closeCamFS();speak('Volviendo al panel');return;}
 
