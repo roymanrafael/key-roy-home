@@ -23,7 +23,14 @@ API_KEY    = "my3cqccuke8fmxasgeek"
 API_SECRET = "42ba1a0754434cbb8533d03eadee893c"
 REGION     = "us"                            # Western America Data Center
 
-cloud = tinytuya.Cloud(apiRegion=REGION, apiKey=API_KEY, apiSecret=API_SECRET)
+# Forzamos la URL del data center de forma explícita
+cloud = tinytuya.Cloud(
+    apiRegion=REGION,
+    apiKey=API_KEY,
+    apiSecret=API_SECRET
+)
+# Aseguramos que apunte al endpoint correcto de Western America
+cloud.urlhost = "openapi.tuyaus.com"
 
 app = Flask(__name__)
 CORS(app)  # permite que el panel (HTML) le hable a este servidor
@@ -49,10 +56,13 @@ def cmd(dev_id):
 
 @app.route("/stream/<dev_id>")
 def stream(dev_id):
-    """Pide URL de video en vivo (para la cámara)"""
+    """Pide URL de video en vivo (para la cámara) — formato RTSP o HLS"""
+    # El tipo de stream va como parámetro: 1=RTSP, 2=HLS
+    tipo = request.args.get("type", "hls").lower()
+    stream_type = "RTSP" if tipo == "rtsp" else "HLS"
     res = cloud.cloudrequest(
         f"/v1.0/devices/{dev_id}/stream/actions/allocate",
-        post={"stream_type": "hls"}
+        post={"type": stream_type}
     )
     return jsonify(res)
 
