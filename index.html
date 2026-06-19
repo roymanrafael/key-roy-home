@@ -360,7 +360,10 @@
     </div>
     <div class="top-right">
       <div class="top-temp">🌡️ <span id="extTempHeaderVal">--°C</span></div>
-      <button class="mic-btn" id="micBtn" onclick="toggleMic()" title="Hola Keyth">🎤</button>
+      <div style="display:flex;align-items:center;gap:7px;">
+        <button class="mic-btn" id="micBtn" onclick="toggleMic()" title="Hola Keyth">🎤</button>
+        <span style="font-size:0.72rem;font-weight:600;color:var(--text);">Hola Keyth</span>
+      </div>
     </div>
   </div>
 
@@ -534,13 +537,12 @@ function tick(){
   document.getElementById('fecha').textContent=n.toLocaleDateString('es-AR',{weekday:'short',day:'numeric',month:'short'});
   document.getElementById('camTs1').textContent=n.toLocaleString('es-AR');
   document.getElementById('camTs2').textContent=n.toLocaleString('es-AR');
-  document.getElementById('camTs3').textContent=n.toLocaleString('es-AR');
 }
 setInterval(tick,1000); tick();
 
 // ── CÁMARAS ──
-let camTuyaActiva = false;
-let camS9Activa = false;
+var camTuyaActiva = false;
+var camS9Activa = false;
 const c1=document.getElementById('cam1'),x1=c1.getContext('2d');
 const c2=document.getElementById('cam2'),x2=c2.getContext('2d');
 
@@ -1156,7 +1158,6 @@ function toggleMic(){
     document.getElementById('micBtn').classList.add('listening');
     document.getElementById('micBtn').textContent='👂';
     showBar('Escucha activa · Decí "Hola Keyth" + comando');
-    speak('Escucha activada. Decime Hola Keyth y el comando.');
   } else {
     detenerEscucha();
     document.getElementById('micBtn').classList.remove('listening');
