@@ -361,10 +361,10 @@
 
     <!-- COL IZQUIERDA: stats -->
     <div class="stats-col">
-      <div class="stat-card blue">
-        <div class="stat-label">Interior · Temp</div>
-        <div class="stat-val" id="tInt">22.4°</div>
-        <div class="stat-sub">humedad <span id="hInt">58</span>%</div>
+      <div class="stat-card blue" id="cardCuarto">
+        <div class="stat-label">Cuarto · Temp ambiente</div>
+        <div class="stat-val" id="tInt">--°</div>
+        <div class="stat-sub" id="tIntSub">esperando datos del aire</div>
       </div>
       <div class="stat-card green">
         <div class="stat-label">Exterior · CABA</div>
@@ -613,8 +613,8 @@ async function toggleCam(){
   }
 }
 
-// ── CÁMARA TUYA EN VIVO (HLS) ──
-const TUYA_PROXY = 'http://localhost:8787';
+// ── TUYA REAL (via proxy en Render — accesible desde cualquier lugar) ──
+const TUYA_PROXY = 'https://key-roy-home.onrender.com';
 const TUYA_CAM_ID = 'eb87499c7364fc2d81acb3';
 let hlsPlayer = null;
 
@@ -660,14 +660,9 @@ async function verCamTuya(){
   }
 }
 
-// ── CLIMA INTERIOR SIMULADO ──
+// ── CLIMA INTERIOR (ahora viene del aire Tuya real) ──
 let bT=22.4,bH=58;
-setInterval(()=>{
-  bT=Math.max(18,Math.min(34,bT+(Math.random()-.5)*.3));
-  bH=Math.max(30,Math.min(88,bH+(Math.random()-.5)*.8));
-  document.getElementById('tInt').textContent=`${bT.toFixed(1)}°`;
-  document.getElementById('hInt').textContent=Math.round(bH);
-},5000);
+// La temperatura del cuarto la actualiza tuyaPoll() con datos reales del aire
 
 // ── SENSOR SALA ──
 let salaTemp=23, acTemp=24;
@@ -691,6 +686,7 @@ function cambiarTempAC(d){
   const el=document.getElementById('acTempVal');
   el.textContent=acTemp;
   el.style.color=colorTempAC(acTemp);
+  tuyaCmdRaw('Aire','temp_set', acTemp*10);  // manda al aire real (Tuya usa décimas)
   dibujarPlano();
 }
 function colorTempAC(t){
@@ -1050,12 +1046,27 @@ async function tuyaCmd(name, on){
   }catch(e){}
 }
 
+// Comando crudo: cambia un código específico (mode, temp_set, etc) del dispositivo
+async function tuyaCmdRaw(name, code, value){
+  const dev = TUYA_DEVICES[name];
+  if(!dev) return;
+  try{
+    await fetch(`${TUYA_PROXY}/cmd/${dev.id}`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({code, value})
+    });
+  }catch(e){}
+}
+
 async function tuyaPoll(){
   for(const [name,dev] of Object.entries(TUYA_DEVICES)){
     try{
       const r = await fetch(`${TUYA_PROXY}/status/${dev.id}`);
-      const st = await r.json();
-      if(Array.isArray(st)){
+      const json = await r.json();
+      // El proxy devuelve {result:[...], success:true} o directamente [...]
+      const st = Array.isArray(json) ? json : (json.result || []);
+      if(Array.isArray(st) && st.length){
         const sw = st.find(s=>s.code===dev.code);
         if(sw){
           const cb=document.querySelector(`#c${name} input[type=checkbox]`);
@@ -1070,11 +1081,9 @@ async function tuyaPoll(){
         }
         // Temperatura ambiente que mide el propio aire Tuya
         if(name==='Aire'){
-          const tempStat = st.find(s=>s.code==='temp_current'||s.code==='temp_set'||s.code==='va_temperature');
+          const tempStat = st.find(s=>s.code==='temp_current');
           if(tempStat){
-            let t = tempStat.value;
-            if(t>100) t = t/10; // algunos Tuya reportan en décimas
-            actualizarTempAireReal(t);
+            actualizarTempAireReal(tempStat.value);
           }
         }
       }
@@ -1085,14 +1094,30 @@ setInterval(tuyaPoll, 10000);
 setTimeout(tuyaPoll, 2000);
 
 function actualizarTempAireReal(t){
-  const el = document.getElementById('stAlarma');
-  el.textContent = `${t.toFixed(1)}°C`;
-  let color;
-  if(t >= 24){ color = '#f08c1e'; }       // caliente → naranja
-  else if(t <= 18){ color = '#2563eb'; }  // frío → azul
-  else { color = '#8c8a86'; }             // templado → neutro
-  el.style.color = color;
-  el.style.fontWeight = '600';
+  bT = t; // usado por la cinta LED también
+
+  // Card "Cuarto" de la columna izquierda
+  const val = document.getElementById('tInt');
+  const sub = document.getElementById('tIntSub');
+  const card = document.getElementById('cardCuarto');
+  val.textContent = `${t.toFixed(1)}°`;
+
+  let color, borde, texto;
+  if(t >= 24){ color='#f08c1e'; borde='#f08c1e'; texto='ambiente cálido'; }       // calor → naranja
+  else if(t <= 18){ color='#2563eb'; borde='#2563eb'; texto='ambiente frío'; }    // frío → azul
+  else { color='#1c1c1c'; borde='#1f9d6c'; texto='ambiente templado'; }           // templado
+
+  val.style.color = color;
+  sub.textContent = texto;
+  if(card) card.style.borderLeftColor = borde;
+
+  // También el indicador chico de "Temp. ambiente AC" en dispositivos
+  const elDev = document.getElementById('stAlarma');
+  if(elDev){
+    elDev.textContent = `${t.toFixed(1)}°C`;
+    elDev.style.color = (t>=24)?'#f08c1e':(t<=18)?'#2563eb':'#8c8a86';
+    elDev.style.fontWeight = '600';
+  }
 }
 
 // ── TOGGLES ──
@@ -1194,8 +1219,35 @@ function handleCmd(raw){
     }
   }
   if(t.includes('aire')||t.includes('acondicionado')){
-    if(enc){setDevice('Aire','m',true);toggleAirePanel();speak('Aire encendido');return;}
-    if(apa){setDevice('Aire','m',false);toggleAirePanel();speak('Aire apagado');return;}
+    // Detectar temperatura específica: "a 25 grados", "en 16"
+    const tempMatch = t.match(/(\d{1,2})\s*(grados?|grado)?/);
+    const tempPedida = tempMatch ? parseInt(tempMatch[1]) : null;
+    // Detectar modo
+    const modoCalor = /(calor|caliente|calefaccion|calefacción|calienta)/.test(t);
+    const modoFrio = /(frio|frío|enfriar|enfria|fresco)/.test(t);
+
+    if(enc || tempPedida!==null || modoCalor || modoFrio){
+      setDevice('Aire','m',true);
+      toggleAirePanel();
+      let msg = 'Aire encendido';
+
+      // Aplicar modo
+      if(modoCalor){ tuyaCmdRaw('Aire','mode','hot'); msg='Aire en modo calor'; }
+      else if(modoFrio){ tuyaCmdRaw('Aire','mode','cold'); msg='Aire en modo frío'; }
+
+      // Aplicar temperatura (Tuya usa décimas: 25° = 250)
+      if(tempPedida!==null && tempPedida>=16 && tempPedida<=30){
+        acTemp = tempPedida;
+        document.getElementById('acTempVal').textContent = acTemp;
+        document.getElementById('acTempVal').style.color = colorTempAC(acTemp);
+        tuyaCmdRaw('Aire','temp_set', tempPedida*10);
+        msg += ` a ${tempPedida} grados`;
+        dibujarPlano();
+      }
+      speak(msg);
+      return;
+    }
+    if(apa){ setDevice('Aire','m',false); toggleAirePanel(); speak('Aire apagado'); return; }
   }
   if(t.includes('alarma')){
     if(enc||t.includes('activ')){setDevice('Alarma','a',true);speak('Alarma activada');return;}
